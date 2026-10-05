@@ -218,7 +218,129 @@ See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 
 ---
 
-## 8. Suggested demo script (5 minutes)
+## 8. Explaining what happens (UI → MetaMask → Etherscan)
+
+Use this section when demoing or writing your lab report. **One sentence:** you clicked a button in CampusVote → MetaMask signed a transaction → Sepolia ran `CampusVoting.sol` → Etherscan shows the receipt.
+
+### Board diagram
+
+```text
+[CampusVote UI]  --ethers.js-->  [MetaMask signs]
+                                      |
+                                      v
+                               [Sepolia network]
+                                      |
+                                      v
+                         [CampusVoting.sol @ 0x7126…]
+                           createProposal / vote
+                                      |
+                                      v
+                         [Events: ProposalCreated / Voted]
+                                      |
+                                      v
+                              [Etherscan receipt]
+```
+
+### Step 1 — Frontend (CampusVote)
+
+On **Create / manage**, you type a question (e.g. `"Elect Club President"`) and click **Publish election**.
+
+That button:
+
+1. Uses the connected contract address (e.g. `0x7126…501B`)
+2. Calls Solidity: `createProposal("Elect Club President")`
+3. Asks MetaMask to send that call as a **transaction**
+
+Toast **"Confirming…"** means: the tx was sent; the app is waiting for a block.
+
+### Step 2 — MetaMask
+
+MetaMask is the **signer**. Your wallet (e.g. `0xF724…c5b6`) pays a tiny bit of Sepolia ETH for gas and proves “this wallet authorized this call.”
+
+| MetaMask text | Meaning |
+|---------------|---------|
+| **Transaction submitted** | Broadcast to Sepolia |
+| **Interaction in progress** | Not mined yet |
+| Green **Contract interaction** | Mined / finished |
+
+MetaMask does **not** store the election. It only signs and sends.
+
+### Step 3 — Etherscan Overview (Success)
+
+When the block mines, Etherscan is the public receipt:
+
+| Field | Meaning |
+|--------|--------|
+| **Status: Success** | Contract ran without reverting |
+| **From** `0xF724…` | Who clicked / signed |
+| **To** `0x7126…501B` | Your CampusVoting contract |
+| **Value 0 ETH** | You didn’t send money — only a function call |
+| **Transaction Action: Create Proposal** | Etherscan decoded the function name |
+
+So: **wallet → voting contract → `createProposal` succeeded.**
+
+### Step 4 — Input Data tab
+
+This is the **exact call** encoded as bytes:
+
+- Function: `createProposal(string)`
+- Argument: `"Elect Club President"`
+
+Frontend → ethers.js packs that string into hex → MetaMask sends it → nodes execute it. **Input Data** is that packing, readable on Etherscan.
+
+### Step 5 — Logs tab (events)
+
+Your contract emitted something like:
+
+```text
+ProposalCreated(proposalId = 2, title = "Elect Club President")
+```
+
+- **Events / Logs** = permanent, searchable history on-chain  
+- **`proposalId` 2** = this is election **#2** (that’s why the UI uses **Election number `2`**)  
+- Hex like `456c656374…` = ASCII for **"Elect Club President"**
+
+**Teaching line:** storage holds the vote counts; events are the “receipt printout.”
+
+### Step 6 — Vote flow (Use app)
+
+Set **Election number** to the id from Logs (e.g. `2`), click **Yes** or **No**. Same pipeline:
+
+**UI `vote(2, true/false)` → MetaMask → contract → `Voted` event**
+
+In Logs you should see:
+
+- Contract `0x7126…501B` (CampusVoting)
+- Event **`Voted`**
+- `proposalId = 2`
+- voter = your wallet
+- support true/false
+
+**See live results** calls `getProposal(2)` and shows Yes/No tallies from storage.
+
+### Don’t confuse this with `redeemDelegations`
+
+Some MetaMask activity / Etherscan pages may also show:
+
+- A different contract (e.g. `0xdb9b1…`)
+- Function **`redeemDelegations`**
+- Event **`RedeemedDelegation`**
+
+That is **MetaMask’s own smart-account / delegation plumbing**, not your workshop contract.
+
+For the lab report, point only at:
+
+1. **To:** your CampusVoting address (`0x7126…` or the address you deployed)
+2. Functions **`createProposal`** / **`vote`**
+3. Logs: **`ProposalCreated`** / **`Voted`**
+
+### 30-second viva answer
+
+> The React app never stores votes. It asks MetaMask to call functions on the Sepolia contract. When the transaction succeeds, Etherscan shows Success, the function in Input Data, and the event in Logs. That’s proof the election and vote are on-chain.
+
+---
+
+## 9. Suggested demo script (5 minutes)
 
 | Step | Who | Action |
 |------|-----|--------|
@@ -227,11 +349,11 @@ See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 | 3 | Student A | Create proposal from UI |
 | 4 | Student B | Vote YES |
 | 5 | Student C | Vote NO |
-| 6 | Anyone | Read tallies + open Etherscan tx |
+| 6 | Anyone | Read tallies + open Etherscan tx (Overview → Input Data → Logs) |
 
 ---
 
-## 9. Lab submission checklist
+## 10. Lab submission checklist
 
 - [ ] Problem statement in your own words  
 - [ ] Contract address + Etherscan link  
@@ -239,12 +361,13 @@ See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 - [ ] Tx hash: `createProposal`  
 - [ ] Tx hash: `vote`  
 - [ ] Screenshot: UI showing Yes/No counts  
+- [ ] Screenshot or notes: Etherscan **Logs** (`ProposalCreated` / `Voted`)  
 - [ ] 5+ notes copied from line-by-line section above  
 - [ ] Architecture diagram (User → MetaMask → Frontend → Contract → Sepolia)  
 
 ---
 
-## 10. Common errors
+## 11. Common errors
 
 | Error | Fix |
 |-------|-----|
@@ -253,11 +376,12 @@ See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 | `Proposal missing` | Create proposal first; use correct id (`0`, `1`, …) |
 | Wrong network | Switch MetaMask to Sepolia |
 | No gas | Get Sepolia ETH from faucet / instructor |
-| Frontend buttons disabled | Connect MetaMask + Save address + Sepolia |
+| Frontend buttons disabled | Connect contract + Sign in + Sepolia |
+| Seeing `redeemDelegations` on Etherscan | Ignore it for the report — use CampusVoting txs only |
 
 ---
 
-## 11. Extensions (optional for higher marks)
+## 12. Extensions (optional for higher marks)
 
 1. Add a proposal deadline (`block.timestamp`)  
 2. Emit and listen to events in the UI  
@@ -266,20 +390,20 @@ See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 
 ---
 
-## 12. Viva / oral questions
+## 13. Viva / oral questions
 
 1. Why can’t two people share one MetaMask account and both vote?  
 2. What is the difference between `view` and a state-changing function?  
 3. Who can call `createProposal` and why?  
 4. Where does the proposal data live after you close the laptop?  
+5. What is the difference between **Input Data** and **Logs** on Etherscan?  
 
 ---
 
-## 13. Files in this folder
+## 14. Files in this folder
 
 | File | Role |
 |------|------|
 | `CampusVoting.sol` | Deploy this in Remix |
+| `frontend/` | Vite + React app (`npm install` → `npm run dev`) |
 | `README.md` | This guide |
-
-Shared UI lives in `/frontend` at the repo root (route `/project/voting`).
