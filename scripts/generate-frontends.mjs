@@ -569,6 +569,13 @@ a{color:var(--accent2)}
   background:color-mix(in srgb,var(--surface) 92%, transparent);border:1px solid var(--line);backdrop-filter:blur(8px)}
 .visual-caption strong{display:block;font-size:.92rem}
 .visual-caption span{color:var(--muted);font-size:.8rem}
+.setup-banner{
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;
+  margin:0 0 1rem;padding:1rem 1.1rem;border-radius:16px;border:1px solid color-mix(in srgb,var(--accent) 35%, var(--line));
+  background:color-mix(in srgb,var(--accent) 10%, var(--surface));animation:rise .5s ease both;
+}
+.setup-banner strong{display:block;margin-bottom:.15rem}
+.setup-banner p{margin:0;color:var(--muted);font-size:.92rem}
 .tabs{
   display:inline-flex;gap:.3rem;padding:.28rem;border-radius:999px;border:1px solid var(--line);
   background:color-mix(in srgb,var(--surface) 85%, transparent);margin:0 0 1rem;animation:rise .7s .15s ease both;
@@ -659,6 +666,13 @@ function sharedState() {
 
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
   const ready = Boolean(signer && saved && isSepolia && !busy)
+  const setupHint = !address
+    ? 'Sign in to continue'
+    : !saved
+      ? 'Connect the app ID in Settings before publishing'
+      : !isSepolia
+        ? 'Switch your wallet to Sepolia, then try again'
+        : ''
 
   useEffect(() => {
     const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
@@ -689,8 +703,15 @@ function sharedState() {
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
-    if (!signer || !saved) { setSettingsOpen(true); setStatus('Sign in and connect the app first'); return }
-    if (!isSepolia) { setStatus('Switch network in your wallet, then retry'); return }
+    if (!signer || !saved) {
+      setSettingsOpen(true)
+      setStatus('Sign in and connect the app ID in Settings first')
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet to Sepolia, then retry')
+      return
+    }
     setBusy(true); setStatus(label + '…'); setTxHash(null)
     try {
       const tx = await fn(); setTxHash(tx.hash); setStatus('Confirming…'); await tx.wait(); setStatus(label + ' complete')
@@ -747,10 +768,29 @@ ${extraState}
           <div className="visual-inner"><div className="orb" /></div>
           <div className="visual-caption">
             <strong>{address ? 'Signed in' : 'Guest mode'}</strong>
-            <span>{saved ? 'Ready to use' : 'Connect app ID in Settings once'}</span>
+            <span>{saved ? (isSepolia || !address ? 'Ready to use' : 'Wrong network — switch to Sepolia') : 'Open Settings → paste App ID (contract address from Remix)'}</span>
           </div>
         </div>
       </header>
+
+      {setupHint && (
+        <div className="setup-banner">
+          <div>
+            <strong>Almost there</strong>
+            <p>{setupHint}</p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              if (!address) void signIn()
+              else setSettingsOpen(true)
+            }}
+          >
+            {!address ? 'Sign in' : 'Open Settings'}
+          </button>
+        </div>
+      )}
 
       <div className="tabs">
         <button type="button" className={tab === 'use' ? 'tab active' : 'tab'} onClick={() => setTab('use')}>Use app</button>

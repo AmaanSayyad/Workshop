@@ -23,6 +23,13 @@ export default function App() {
 
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
   const ready = Boolean(signer && saved && isSepolia && !busy)
+  const setupHint = !address
+    ? 'Sign in to continue'
+    : !saved
+      ? 'Connect the app ID in Settings before publishing'
+      : !isSepolia
+        ? 'Switch your wallet to Sepolia, then try again'
+        : ''
 
   useEffect(() => {
     const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
@@ -53,8 +60,15 @@ export default function App() {
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
-    if (!signer || !saved) { setSettingsOpen(true); setStatus('Sign in and connect the app first'); return }
-    if (!isSepolia) { setStatus('Switch network in your wallet, then retry'); return }
+    if (!signer || !saved) {
+      setSettingsOpen(true)
+      setStatus('Sign in and connect the app ID in Settings first')
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet to Sepolia, then retry')
+      return
+    }
     setBusy(true); setStatus(label + '…'); setTxHash(null)
     try {
       const tx = await fn(); setTxHash(tx.hash); setStatus('Confirming…'); await tx.wait(); setStatus(label + ' complete')
@@ -103,10 +117,29 @@ export default function App() {
           <div className="visual-inner"><div className="orb" /></div>
           <div className="visual-caption">
             <strong>{address ? 'Signed in' : 'Guest mode'}</strong>
-            <span>{saved ? 'Ready to use' : 'Connect app ID in Settings once'}</span>
+            <span>{saved ? (isSepolia || !address ? 'Ready to use' : 'Wrong network — switch to Sepolia') : 'Open Settings → paste App ID (contract address from Remix)'}</span>
           </div>
         </div>
       </header>
+
+      {setupHint && (
+        <div className="setup-banner">
+          <div>
+            <strong>Almost there</strong>
+            <p>{setupHint}</p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              if (!address) void signIn()
+              else setSettingsOpen(true)
+            }}
+          >
+            {!address ? 'Sign in' : 'Open Settings'}
+          </button>
+        </div>
+      )}
 
       <div className="tabs">
         <button type="button" className={tab === 'use' ? 'tab active' : 'tab'} onClick={() => setTab('use')}>Use app</button>

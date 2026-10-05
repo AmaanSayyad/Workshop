@@ -91,6 +91,13 @@ a{color:var(--accent2)}
   background:color-mix(in srgb,var(--surface) 92%, transparent);border:1px solid var(--line);backdrop-filter:blur(8px)}
 .visual-caption strong{display:block;font-size:.92rem}
 .visual-caption span{color:var(--muted);font-size:.8rem}
+.setup-banner{
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;
+  margin:0 0 1rem;padding:1rem 1.1rem;border-radius:16px;border:1px solid color-mix(in srgb,var(--accent) 35%, var(--line));
+  background:color-mix(in srgb,var(--accent) 10%, var(--surface));animation:rise .5s ease both;
+}
+.setup-banner strong{display:block;margin-bottom:.15rem}
+.setup-banner p{margin:0;color:var(--muted);font-size:.92rem}
 .tabs{
   display:inline-flex;gap:.3rem;padding:.28rem;border-radius:999px;border:1px solid var(--line);
   background:color-mix(in srgb,var(--surface) 85%, transparent);margin:0 0 1rem;animation:rise .7s .15s ease both;
