@@ -3,7 +3,7 @@ import type { ContractTransactionResponse, JsonRpcSigner } from 'ethers'
 import { formatEther, parseEther } from 'ethers'
 import {
   SEPOLIA_CHAIN_ID, STORAGE_KEY, connectWallet, explorerTx, getContract, hashText,
-  isAddressLike, shortAddress, switchToSepolia,
+  isAddressLike, reconnectWallet, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
 import { DEFAULT_APP_ID } from './config'
@@ -39,6 +39,40 @@ export default function App() {
       (localStorage.getItem(STORAGE_KEY) && isAddressLike(localStorage.getItem(STORAGE_KEY)!) && localStorage.getItem(STORAGE_KEY)) ||
       (isAddressLike(DEFAULT_APP_ID) ? DEFAULT_APP_ID : '')
     if (s && isAddressLike(s)) { setAppId(s); setSaved(s) }
+
+    let cancelled = false
+    const apply = (w: { address: string; signer: import('ethers').JsonRpcSigner; chainId: bigint }) => {
+      if (cancelled) return
+      setAddress(w.address)
+      setSigner(w.signer)
+      setChainId(w.chainId)
+    }
+    const clear = () => {
+      if (cancelled) return
+      setAddress(null)
+      setSigner(null)
+      setChainId(null)
+    }
+
+    // Restore MetaMask session after refresh (no popup)
+    void reconnectWallet().then((w) => { if (w) apply(w) }).catch(() => {})
+
+    const eth = window.ethereum
+    const onAccounts = (accounts: unknown) => {
+      const list = accounts as string[]
+      if (!list?.length) { clear(); return }
+      void reconnectWallet().then((w) => { if (w) apply(w) }).catch(() => {})
+    }
+    const onChain = () => {
+      void reconnectWallet().then((w) => { if (w) apply(w) }).catch(() => {})
+    }
+    eth?.on?.('accountsChanged', onAccounts)
+    eth?.on?.('chainChanged', onChain)
+    return () => {
+      cancelled = true
+      eth?.removeListener?.('accountsChanged', onAccounts)
+      eth?.removeListener?.('chainChanged', onChain)
+    }
   }, [])
 
   async function signIn() {

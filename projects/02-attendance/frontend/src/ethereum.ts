@@ -14,6 +14,12 @@ declare global {
   }
 }
 
+export type WalletSession = {
+  address: string
+  signer: JsonRpcSigner
+  chainId: bigint
+}
+
 export function shortAddress(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`
 }
@@ -22,13 +28,32 @@ export function isAddressLike(v: string) {
   return /^0x[a-fA-F0-9]{40}$/.test(v.trim())
 }
 
-export async function connectWallet() {
-  if (!window.ethereum) throw new Error('Install a wallet to sign in')
-  const provider = new BrowserProvider(window.ethereum)
-  await provider.send('eth_requestAccounts', [])
+/** Build session from an already-authorized provider (no MetaMask popup). */
+async function sessionFromProvider(provider: BrowserProvider): Promise<WalletSession> {
   const signer = await provider.getSigner()
   const network = await provider.getNetwork()
   return { address: await signer.getAddress(), signer, chainId: network.chainId }
+}
+
+/**
+ * Silent reconnect after page refresh.
+ * Uses eth_accounts (no popup). Returns null if the site was never approved
+ * or the user disconnected in MetaMask.
+ */
+export async function reconnectWallet(): Promise<WalletSession | null> {
+  if (!window.ethereum) return null
+  const provider = new BrowserProvider(window.ethereum)
+  const accounts = (await provider.send('eth_accounts', [])) as string[]
+  if (!accounts.length) return null
+  return sessionFromProvider(provider)
+}
+
+/** First-time / explicit Sign in — may show MetaMask popup. */
+export async function connectWallet(): Promise<WalletSession> {
+  if (!window.ethereum) throw new Error('Install a wallet to sign in')
+  const provider = new BrowserProvider(window.ethereum)
+  await provider.send('eth_requestAccounts', [])
+  return sessionFromProvider(provider)
 }
 
 export async function switchToSepolia() {
