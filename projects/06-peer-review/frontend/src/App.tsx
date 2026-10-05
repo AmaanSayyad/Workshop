@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ContractTransactionResponse, JsonRpcSigner } from 'ethers'
 import { formatEther, parseEther } from 'ethers'
 import {
-  SEPOLIA_CHAIN_ID, STORAGE_KEY, assertContractDeployed, connectWallet, explorerAddress,
+  SEPOLIA_CHAIN_ID, STORAGE_KEY, assertContractDeployed, connectWallet, explorerAddress, friendlyTxError,
   explorerTx, getContract, hashText, isAddressLike, reconnectWallet, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
@@ -133,7 +133,7 @@ export default function App() {
     try {
       const tx = await fn(); setTxHash(tx.hash); setStatus('Confirming…'); await tx.wait(); setStatus(label + ' complete')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Something went wrong')
+      setStatus(friendlyTxError(e))
     } finally { setBusy(false) }
   }, [signer, saved, isSepolia])
 
@@ -238,7 +238,7 @@ export default function App() {
         {tab === 'use' ? (
           <section className="card">
             <h2>Leave a review <span className="stars">{'★'.repeat(Math.min(5, Math.max(1, Number(score) || 1)))}</span></h2>
-            <p className="sub">Use a different account than the author.</p>
+            <p className="sub">Important: the wallet that published the project CANNOT rate it. Switch MetaMask to another account (or ask a classmate), then Submit review.</p>
             <div className="field"><label>Project number</label><input value={projectId} onChange={(e) => setProjectId(e.target.value)} /></div>
             <div className="field"><label>Stars (1–5)</label><input value={score} onChange={(e) => setScore(e.target.value)} /></div>
             <div className="field"><label>Comment</label><input value={comment} onChange={(e) => setComment(e.target.value)} /></div>

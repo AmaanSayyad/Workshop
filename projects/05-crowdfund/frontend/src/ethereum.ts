@@ -103,3 +103,36 @@ export function explorerTx(hash: string) {
 export function explorerAddress(address: string) {
   return `https://sepolia.etherscan.io/address/${address}`
 }
+
+/** Pull Solidity require() reason out of ethers v6 errors for student-friendly toasts. */
+export function friendlyTxError(err: unknown): string {
+  if (!err || typeof err !== 'object') return 'Something went wrong'
+  const e = err as { shortMessage?: string; reason?: string; message?: string; info?: { error?: { message?: string } } }
+  const blob = [e.reason, e.shortMessage, e.message, e.info?.error?.message].filter(Boolean).join(' | ')
+  const known = [
+    'Cannot self-rate',
+    'Already rated',
+    'Already voted',
+    'Only owner',
+    'Missing project',
+    'Missing poll',
+    'Missing item',
+    'Score 1-5',
+    'Poll closed',
+    'Already checked in',
+    'Session closed',
+    'Session missing',
+    'Hash already registered',
+  ]
+  for (const k of known) {
+    if (blob.includes(k)) {
+      if (k === 'Cannot self-rate') {
+        return 'Cannot self-rate — switch MetaMask to a different account than the project author, then try again'
+      }
+      return k
+    }
+  }
+  if (e.shortMessage) return e.shortMessage
+  if (e.message && e.message.length < 160) return e.message
+  return 'Transaction failed — check MetaMask account, network (Sepolia), and that you own this action'
+}

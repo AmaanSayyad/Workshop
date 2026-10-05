@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ContractTransactionResponse, JsonRpcSigner } from 'ethers'
 import { formatEther, parseEther } from 'ethers'
 import {
-  SEPOLIA_CHAIN_ID, STORAGE_KEY, assertContractDeployed, connectWallet, explorerAddress,
+  SEPOLIA_CHAIN_ID, STORAGE_KEY, assertContractDeployed, connectWallet, explorerAddress, friendlyTxError,
   explorerTx, getContract, hashText, isAddressLike, reconnectWallet, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
@@ -133,7 +133,7 @@ export default function App() {
     try {
       const tx = await fn(); setTxHash(tx.hash); setStatus('Confirming…'); await tx.wait(); setStatus(label + ' complete')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Something went wrong')
+      setStatus(friendlyTxError(e))
     } finally { setBusy(false) }
   }, [signer, saved, isSepolia])
 
