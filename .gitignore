@@ -8,6 +8,4 @@
 
 deployments.sepolia.env
 **/.env.local
-forge-deploy/out/
-forge-deploy/cache/
-forge-deploy/broadcast/
+forge-deploy/
