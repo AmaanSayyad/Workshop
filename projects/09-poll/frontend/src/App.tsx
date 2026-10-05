@@ -6,6 +6,7 @@ import {
   isAddressLike, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
+import { DEFAULT_APP_ID } from './config'
 
 export default function App() {
 
@@ -33,7 +34,10 @@ export default function App() {
 
   useEffect(() => {
     const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
-    const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
+    const s =
+      (fromEnv && isAddressLike(fromEnv) && fromEnv) ||
+      (localStorage.getItem(STORAGE_KEY) && isAddressLike(localStorage.getItem(STORAGE_KEY)!) && localStorage.getItem(STORAGE_KEY)) ||
+      (isAddressLike(DEFAULT_APP_ID) ? DEFAULT_APP_ID : '')
     if (s && isAddressLike(s)) { setAppId(s); setSaved(s) }
   }, [])
 

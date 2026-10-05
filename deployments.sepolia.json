@@ -1,0 +1,17 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0xF7249B507F1f89Eaea5d694cEf5cb96F245Bc5b6",
+  "contracts": {
+    "CampusVoting": "0x7126AEfe1933d6f29A1935eAb5c538375328501B",
+    "AttendanceCheckIn": "0xfeAAa8c66A6b395256eA232036D8858f22d7bBa2",
+    "CertificateRegistry": "0x16E877Bdff161B111d5821C356E6430F253f17f4",
+    "ComplaintTracker": "0x9A126373f2D36C7b18bE9D9e4e7D4fDE65692061",
+    "CampusCrowdfund": "0x6cA59B853f699CC98ba54677bD3FBf824C43D270",
+    "PeerReview": "0xb284aC4D4f63297FE6bD624CCA5A1BEF51Ae65Ff",
+    "ScholarshipLedger": "0x9689642B54c0F43852950Ed85A840eB0a59F8041",
+    "InventoryLog": "0x01A5E48849D6079EEd4179d4721eB05739d6E1Ac",
+    "CampusPoll": "0x8d3841FfB31C6678E252E6B9D0CB15E0077421FB",
+    "AIModelRegistry": "0x16715eA6D65632945c38AE6464992CF801d15327"
+  }
+}
