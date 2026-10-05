@@ -168,3 +168,18 @@ This is a **teaching** contract. Production crowdfunding needs: reentrancy guard
 |------|------|
 | `CampusCrowdfund.sol` | Remix deploy (with constructor) |
 | `README.md` | This guide |
+
+---
+
+## Standalone frontend (this project only)
+
+Each mini-project ships its **own** React app under `frontend/` — not a shared multi-app shell.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the local URL → Connect MetaMask (Sepolia) → paste your Remix contract address → use the product UI.
+
