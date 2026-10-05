@@ -40,8 +40,10 @@ Every project folder contains:
 
 ## Student flow (any one project)
 
+Full walkthrough: [`docs/STUDENT_QUICKSTART.md`](./docs/STUDENT_QUICKSTART.md)
+
 1. Open that project’s `README.md` and pick the story for your report  
-2. Deploy the `.sol` file in [Remix](https://remix.ethereum.org) → Sepolia  
+2. Deploy the `.sol` file in [Remix](https://remix.ethereum.org) → **Sepolia** → copy the address  
 3. Run **only that project’s** frontend:
 
 ```bash
@@ -50,7 +52,7 @@ npm install
 npm run dev
 ```
 
-4. Connect MetaMask → paste contract address → use the app  
+4. In the DApp: paste the Remix address → **Connect contract** → **Sign in** with MetaMask  
 5. Submit Etherscan links + screenshots for Exp 9 & 10  
 
 ---

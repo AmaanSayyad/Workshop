@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ContractTransactionResponse, JsonRpcSigner } from 'ethers'
 import { formatEther, parseEther } from 'ethers'
 import {
-  SEPOLIA_CHAIN_ID, STORAGE_KEY, connectWallet, explorerTx, getContract, hashText,
-  isAddressLike, reconnectWallet, shortAddress, switchToSepolia,
+  SEPOLIA_CHAIN_ID, STORAGE_KEY, assertContractDeployed, connectWallet, explorerAddress,
+  explorerTx, getContract, hashText, isAddressLike, reconnectWallet, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
 import { DEFAULT_APP_ID } from './config'
@@ -24,21 +24,23 @@ export default function App() {
 
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
   const ready = Boolean(signer && saved && isSepolia && !busy)
-  const setupHint = !address
-    ? 'Sign in to continue'
-    : !saved
-      ? 'Connect the app ID in Settings before publishing'
+  const setupHint = !saved
+    ? 'Paste your Remix contract address below and click Connect contract'
+    : !address
+      ? 'Sign in with MetaMask to use the app'
       : !isSepolia
         ? 'Switch your wallet to Sepolia, then try again'
         : ''
 
   useEffect(() => {
     const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
+    const fromLs = localStorage.getItem(STORAGE_KEY)
     const s =
       (fromEnv && isAddressLike(fromEnv) && fromEnv) ||
-      (localStorage.getItem(STORAGE_KEY) && isAddressLike(localStorage.getItem(STORAGE_KEY)!) && localStorage.getItem(STORAGE_KEY)) ||
-      (isAddressLike(DEFAULT_APP_ID) ? DEFAULT_APP_ID : '')
-    if (s && isAddressLike(s)) { setAppId(s); setSaved(s) }
+      (fromLs && isAddressLike(fromLs) && fromLs) ||
+      ''
+    if (s) { setAppId(s); setSaved(s) }
+    else if (isAddressLike(DEFAULT_APP_ID)) setAppId(DEFAULT_APP_ID)
 
     let cancelled = false
     const apply = (w: { address: string; signer: import('ethers').JsonRpcSigner; chainId: bigint }) => {
@@ -54,7 +56,6 @@ export default function App() {
       setChainId(null)
     }
 
-    // Restore MetaMask session after refresh (no popup)
     void reconnectWallet().then((w) => { if (w) apply(w) }).catch(() => {})
 
     const eth = window.ethereum
@@ -90,17 +91,38 @@ export default function App() {
     }
   }
 
-  function saveConnection() {
-    const v = appId.trim()
-    if (!isAddressLike(v)) { setStatus('Paste a valid app ID'); return }
-    localStorage.setItem(STORAGE_KEY, v)
-    setSaved(v); setSettingsOpen(false); setStatus('App connected')
+  async function connectContract(override?: string) {
+    const v = (override ?? appId).trim()
+    if (!isAddressLike(v)) {
+      setStatus('Paste a valid contract address from Remix (starts with 0x)')
+      return
+    }
+    setBusy(true)
+    setStatus('Checking contract on-chain…')
+    try {
+      await assertContractDeployed(v)
+      localStorage.setItem(STORAGE_KEY, v)
+      setAppId(v)
+      setSaved(v)
+      setSettingsOpen(false)
+      setStatus('Contract connected — you can use the app now')
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Could not connect contract')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function disconnectContract() {
+    localStorage.removeItem(STORAGE_KEY)
+    setSaved(null)
+    setStatus('Contract disconnected — paste a new Remix address to reconnect')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
     if (!signer || !saved) {
       setSettingsOpen(true)
-      setStatus('Sign in and connect the app ID in Settings first')
+      setStatus('Connect your Remix contract address, then sign in')
       return
     }
     if (!isSepolia) {
@@ -154,7 +176,7 @@ export default function App() {
           <div className="visual-inner"><div className="orb" /></div>
           <div className="visual-caption">
             <strong>{address ? 'Signed in' : 'Guest mode'}</strong>
-            <span>{saved ? (isSepolia || !address ? 'Ready to use' : 'Wrong network — switch to Sepolia') : 'Open Settings → paste App ID (contract address from Remix)'}</span>
+            <span>{saved ? (isSepolia || !address ? 'Ready to use' : 'Wrong network — switch to Sepolia') : 'Connect your Remix contract address to get started'}</span>
           </div>
         </div>
       </header>
@@ -169,12 +191,41 @@ export default function App() {
             type="button"
             className="btn"
             onClick={() => {
-              if (!address) void signIn()
-              else setSettingsOpen(true)
+              if (!saved) setSettingsOpen(true)
+              else if (!address) void signIn()
+              else void switchToSepolia()
             }}
           >
-            {!address ? 'Sign in' : 'Open Settings'}
+            {!saved ? 'Connect contract' : !address ? 'Sign in' : 'Switch network'}
           </button>
+        </div>
+      )}
+
+      {!saved ? (
+        <section className="card" style={{ marginBottom: '1rem' }}>
+          <h2>Connect your contract</h2>
+          <p className="sub">1) Deploy the .sol file in Remix on Sepolia · 2) Copy the contract address · 3) Paste it here and connect.</p>
+          <div className="field">
+            <label>Contract address from Remix</label>
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+          </div>
+          <div className="row">
+            <button type="button" className="btn" disabled={busy} onClick={() => void connectContract()}>Connect contract</button>
+            {isAddressLike(DEFAULT_APP_ID) && (
+              <button type="button" className="btn secondary" disabled={busy} onClick={() => void connectContract(DEFAULT_APP_ID)}>Use workshop demo</button>
+            )}
+          </div>
+        </section>
+      ) : (
+        <div className="setup-banner" style={{ marginBottom: '1rem' }}>
+          <div>
+            <strong>Contract connected</strong>
+            <p>
+              <a href={explorerAddress(saved)} target="_blank" rel="noreferrer">{shortAddress(saved)}</a>
+              {' '}— change anytime if you redeploy on Remix
+            </p>
+          </div>
+          <button type="button" className="btn secondary" onClick={() => { setSettingsOpen(true) }}>Change</button>
         </div>
       )}
 
@@ -219,14 +270,15 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>App setup</h3>
-            <p>Organizers paste the shared app ID once. After that, everyone signs in and uses the product.</p>
+            <h3>Connect contract</h3>
+            <p>Paste the address Remix showed after you deployed on Sepolia. The app verifies bytecode, then wires every button to that contract.</p>
             <div className="field">
-              <label>App ID</label>
+              <label>Contract address</label>
               <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
             </div>
             <div className="row">
-              <button type="button" className="btn" onClick={saveConnection}>Save</button>
+              <button type="button" className="btn" disabled={busy} onClick={() => void connectContract()}>Connect contract</button>
+              {saved && <button type="button" className="btn secondary" onClick={() => { disconnectContract(); setSettingsOpen(false) }}>Disconnect</button>}
               <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
             </div>
           </div>

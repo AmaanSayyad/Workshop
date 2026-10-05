@@ -406,11 +406,12 @@ function writeBase(dir, app) {
 }
 
 function ethereumTs() {
-  return `import { BrowserProvider, Contract, JsonRpcSigner, keccak256, toUtf8Bytes } from 'ethers'
+  return `import { BrowserProvider, Contract, JsonRpcProvider, JsonRpcSigner, keccak256, toUtf8Bytes } from 'ethers'
 
 export const SEPOLIA_CHAIN_ID = 11155111n
 export const SEPOLIA_HEX = '0xaa36a7'
 export const STORAGE_KEY = 'app-connection-id'
+const PUBLIC_SEPOLIA_RPC = 'https://rpc.sepolia.org'
 
 declare global {
   interface Window {
@@ -433,7 +434,7 @@ export function shortAddress(a: string) {
 }
 
 export function isAddressLike(v: string) {
-  return /^0x[a-fA-F0-9]{40}$/.test(v.trim())
+  return /^0x[a-fA-F0-9]{40}\$/.test(v.trim())
 }
 
 async function sessionFromProvider(provider: BrowserProvider): Promise<WalletSession> {
@@ -451,11 +452,28 @@ export async function reconnectWallet(): Promise<WalletSession | null> {
   return sessionFromProvider(provider)
 }
 
+/** First-time / explicit Sign in — may show MetaMask popup. */
 export async function connectWallet(): Promise<WalletSession> {
   if (!window.ethereum) throw new Error('Install a wallet to sign in')
   const provider = new BrowserProvider(window.ethereum)
   await provider.send('eth_requestAccounts', [])
   return sessionFromProvider(provider)
+}
+
+/**
+ * Confirm bytecode exists at address (Remix deploy succeeded).
+ * Uses MetaMask if present, otherwise a public Sepolia RPC.
+ */
+export async function assertContractDeployed(address: string) {
+  const provider = window.ethereum
+    ? new BrowserProvider(window.ethereum)
+    : new JsonRpcProvider(PUBLIC_SEPOLIA_RPC)
+  const code = await provider.getCode(address.trim())
+  if (!code || code === '0x') {
+    throw new Error(
+      'No contract found at that address. Deploy on Remix (Injected Provider → Sepolia), then paste the new address.',
+    )
+  }
 }
 
 export async function switchToSepolia() {
@@ -488,6 +506,10 @@ export function hashText(text: string) {
 
 export function explorerTx(hash: string) {
   return \`https://sepolia.etherscan.io/tx/\${hash}\`
+}
+
+export function explorerAddress(address: string) {
+  return \`https://sepolia.etherscan.io/address/\${address}\`
 }
 `
 }

@@ -205,14 +205,16 @@ npm install
 npm run dev
 ```
 
-1. Open the app → **Connect MetaMask** → Sepolia  
-2. Click **College / Club Voting**  
-3. Paste contract address → **Save & Use**  
+1. Open the app  
+2. Paste the Remix contract address → **Connect contract** (app verifies bytecode on-chain)  
+3. **Sign in** with MetaMask on Sepolia  
 4. As owner: create proposal (e.g. `Elect Club President`)  
 5. Switch MetaMask account (or ask a classmate) → **Vote YES/NO**  
-6. **Read proposal** → screenshot Yes/No counts  
+6. **See live results** → screenshot Yes/No counts  
 
-Address is stored in `localStorage` key `workshop-contract-voting`.
+Address is saved in the browser (`localStorage`). Redeploy? Click **Change** and paste the new address.
+
+See also: [`docs/STUDENT_QUICKSTART.md`](../../docs/STUDENT_QUICKSTART.md)
 
 ---
 
