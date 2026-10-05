@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: MIT
 // =============================================================================
-// MINI-PROJECT 09 — Campus Event Poll / Prediction (no real money)
-// Create a poll with up to 5 options; one vote per wallet.
+// MINI-PROJECT 09 — Campus Poll
+// READ FIRST: docs/SOLIDITY_BASICS.md
+// KEY IDEA: dynamic arrays in storage (options[] parallel to votes[]).
 // =============================================================================
 pragma solidity ^0.8.20;
 
 /// @title CampusPoll
+/// @notice Multi-option polls (2–5 choices), one vote per wallet.
 contract CampusPoll {
     address public owner;
 
     struct Poll {
         string question;
-        string[] options;
-        uint256[] votes;
+        string[] options; // dynamic array of choice labels
+        uint256[] votes;  // same length as options; votes[i] for options[i]
         bool open;
         bool exists;
     }
 
     mapping(uint256 => Poll) public polls;
     uint256 public pollCount;
-
     mapping(uint256 => mapping(address => bool)) public hasVoted;
 
     event PollCreated(uint256 indexed id, string question);
@@ -35,14 +36,18 @@ contract CampusPoll {
         owner = msg.sender;
     }
 
+    /// @notice Create poll with 2–5 options.
+    // string[] calldata options = array passed from Remix/frontend
     function createPoll(string calldata question, string[] calldata options) external onlyOwner returns (uint256) {
         require(options.length >= 2 && options.length <= 5, "2-5 options");
         uint256 id = pollCount;
 
+        // Assign fields on the struct in storage, then push array elements
         polls[id].question = question;
         polls[id].open = true;
         polls[id].exists = true;
 
+        // for-loop copies each option and starts its vote count at 0
         for (uint256 i = 0; i < options.length; i++) {
             polls[id].options.push(options[i]);
             polls[id].votes.push(0);
@@ -53,6 +58,7 @@ contract CampusPoll {
         return id;
     }
 
+    /// @notice Vote for optionIndex (0 = first choice).
     function vote(uint256 pollId, uint256 optionIndex) external {
         require(polls[pollId].exists, "Missing poll");
         require(polls[pollId].open, "Poll closed");

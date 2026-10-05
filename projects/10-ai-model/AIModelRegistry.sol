@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT
 // =============================================================================
-// MINI-PROJECT 10 — AI Model / Dataset Hash Registry (AIML-friendly)
-// Researchers register model name + version + content hash for provenance.
+// MINI-PROJECT 10 — AI Model Hash Registry
+// READ FIRST: docs/SOLIDITY_BASICS.md
+// KEY IDEA: store model CARD hash for provenance — not the neural weights file.
 // =============================================================================
 pragma solidity ^0.8.20;
 
 /// @title AIModelRegistry
+/// @notice Register / verify ML model fingerprints (great for AIML students).
 contract AIModelRegistry {
     address public owner;
 
     struct ModelRecord {
         string name;
         string version;
-        bytes32 contentHash;  // keccak256 of weights/manifest
-        string framework;     // "PyTorch", "TensorFlow", etc.
-        address publisher;
+        bytes32 contentHash; // keccak256 of manifest / model card text
+        string framework;    // "PyTorch", "TensorFlow", …
+        address publisher;   // who registered it (msg.sender)
         uint256 publishedAt;
         bool exists;
     }
@@ -37,12 +39,14 @@ contract AIModelRegistry {
         owner = msg.sender;
     }
 
+    /// @notice Anyone can publish a model fingerprint (open research style).
     function registerModel(
         string calldata name,
         string calldata version,
         bytes32 contentHash,
         string calldata framework
     ) external returns (uint256) {
+        // bytes(name).length > 0 checks non-empty string
         require(bytes(name).length > 0, "Name required");
         require(contentHash != bytes32(0), "Empty hash");
         require(!hashRegistered[contentHash], "Hash already registered");
@@ -65,6 +69,7 @@ contract AIModelRegistry {
         return id;
     }
 
+    /// @notice Check if a hash was registered and by whom.
     function verifyModel(bytes32 contentHash)
         external
         view

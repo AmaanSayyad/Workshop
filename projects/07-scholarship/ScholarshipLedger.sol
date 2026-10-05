@@ -1,25 +1,27 @@
 // SPDX-License-Identifier: MIT
 // =============================================================================
-// MINI-PROJECT 07 — Scholarship / Fee Transparency Ledger
-// Admin records grants publicly; anyone can read — transparency without middlemen.
+// MINI-PROJECT 07 — Scholarship Transparency Ledger
+// READ FIRST: docs/SOLIDITY_BASICS.md
+// KEY IDEA: recording amounts ≠ sending ETH. This is a public log only.
 // =============================================================================
 pragma solidity ^0.8.20;
 
 /// @title ScholarshipLedger
+/// @notice Admin publishes grant rows; anyone can read.
 contract ScholarshipLedger {
     address public owner;
 
     struct Grant {
         string studentName;
-        string purpose;     // "Tuition", "Hostel", "Research"
-        uint256 amountWei;  // recorded amount (may be symbolic on testnet)
+        string purpose;     // "Tuition", "Hostel", …
+        uint256 amountWei;  // recorded amount (symbolic on testnet is fine)
         uint256 recordedAt;
         bool exists;
     }
 
     mapping(uint256 => Grant) public grants;
     uint256 public grantCount;
-    uint256 public totalRecorded;
+    uint256 public totalRecorded; // running sum of amountWei
 
     event GrantRecorded(uint256 indexed id, string studentName, uint256 amountWei);
 
@@ -32,6 +34,7 @@ contract ScholarshipLedger {
         owner = msg.sender;
     }
 
+    /// @notice Append one public grant entry.
     function recordGrant(
         string calldata studentName,
         string calldata purpose,

@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 // =============================================================================
-// MINI-PROJECT 08 — Supply / Inventory / Custody Log
-// Add items and transfer custody between wallets (lab equipment, kits, etc.).
+// MINI-PROJECT 08 — Inventory / Custody Log
+// READ FIRST: docs/SOLIDITY_BASICS.md
+// KEY IDEA: custody is an address — who currently holds the item.
 // =============================================================================
 pragma solidity ^0.8.20;
 
 /// @title InventoryLog
+/// @notice Track lab kits: add, transfer custody, update location.
 contract InventoryLog {
     address public owner;
 
     struct Item {
         string name;
         string location;
-        address custodian;  // who currently holds it
+        address custodian; // wallet responsible right now
         bool exists;
     }
 
@@ -32,6 +34,8 @@ contract InventoryLog {
         owner = msg.sender;
     }
 
+    /// @notice Admin registers equipment.
+    // address(0) = empty address — always reject as custodian
     function addItem(string calldata name, string calldata location, address custodian)
         external
         onlyOwner
@@ -45,7 +49,7 @@ contract InventoryLog {
         return id;
     }
 
-    /// @notice Current custodian (or owner) transfers item to someone else.
+    /// @notice Current custodian OR owner can hand the item to someone else.
     function transferCustody(uint256 id, address to) external {
         require(items[id].exists, "Missing item");
         require(to != address(0), "Bad address");
