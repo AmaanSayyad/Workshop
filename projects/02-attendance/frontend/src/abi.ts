@@ -1,6 +1,4 @@
 export const abi = [
-  "function owner() view returns (address)",
-  "function sessionCount() view returns (uint256)",
   "function createSession(string name) returns (uint256)",
   "function closeSession(uint256 sessionId)",
   "function checkIn(uint256 sessionId)",

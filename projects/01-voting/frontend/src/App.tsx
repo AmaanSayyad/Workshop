@@ -15,153 +15,187 @@ import {
 import { abi } from './abi'
 
 export default function App() {
+
   const [address, setAddress] = useState<string | null>(null)
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null)
   const [chainId, setChainId] = useState<bigint | null>(null)
-  const [contractAddr, setContractAddr] = useState('')
+  const [appId, setAppId] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [out, setOut] = useState('')
+  const [result, setResult] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [title, setTitle] = useState('Elect Club President')
-  const [proposalId, setProposalId] = useState('0')
-
-
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
+  const ready = Boolean(signer && saved && isSepolia && !busy)
 
   useEffect(() => {
-    const s = localStorage.getItem(STORAGE_KEY)
+    const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
+    const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
     if (s && isAddressLike(s)) {
-      setContractAddr(s)
+      setAppId(s)
       setSaved(s)
     }
   }, [])
 
-  async function connect() {
+  async function signIn() {
     try {
       const w = await connectWallet()
       setAddress(w.address)
       setSigner(w.signer)
       setChainId(w.chainId)
+      if (w.chainId !== SEPOLIA_CHAIN_ID) {
+        await switchToSepolia()
+        const again = await connectWallet()
+        setAddress(again.address)
+        setSigner(again.signer)
+        setChainId(again.chainId)
+      }
       setStatus('')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Wallet error')
+      setStatus(e instanceof Error ? e.message : 'Could not sign in')
     }
   }
 
-  function saveAddress() {
-    const v = contractAddr.trim()
+  function saveConnection() {
+    const v = appId.trim()
     if (!isAddressLike(v)) {
-      setStatus('Enter a valid 0x contract address')
+      setStatus('Paste a valid app connection id (0x…)')
       return
     }
     localStorage.setItem(STORAGE_KEY, v)
     setSaved(v)
-    setStatus('Contract address saved')
+    setSettingsOpen(false)
+    setStatus('Connected to your deployment')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
+    if (!signer || !saved) {
+      setStatus('Sign in and connect your deployment in Settings first')
+      setSettingsOpen(true)
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet network, then try again')
+      return
+    }
     setBusy(true)
-    setStatus(label)
+    setStatus(label + '…')
     setTxHash(null)
     try {
       const tx = await fn()
       setTxHash(tx.hash)
-      setStatus(label + ' — confirming…')
+      setStatus('Waiting for confirmation…')
       await tx.wait()
-      setStatus(label + ' — confirmed')
+      setStatus(label + ' — done')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Tx failed')
+      setStatus(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [signer, saved, isSepolia])
 
-  const ready = Boolean(signer && saved && isSepolia && !busy)
+  const [title, setTitle] = useState('Elect Club President')
+  const [proposalId, setProposalId] = useState('0')
+
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <strong>CampusVote</strong>
-          <span>Sepolia · CampusVoting</span>
+    <div className="shell">
+      <nav className="nav">
+        <div className="logo">
+          <div className="mark">C</div>
+          <div>
+            <strong>CampusVote</strong>
+            <small>Elections</small>
+          </div>
         </div>
-        <div className="row" style={{ margin: 0 }}>
-          {address && !isSepolia && (
-            <button type="button" className="btn ghost" onClick={() => void switchToSepolia().then(connect)}>
-              Switch Sepolia
-            </button>
+        <div className="nav-actions">
+          <button type="button" className="btn secondary" onClick={() => setSettingsOpen(true)}>Settings</button>
+          {address ? (
+            <span className="pill">{shortAddress(address)}</span>
+          ) : (
+            <button type="button" className="btn" onClick={() => void signIn()}>Sign in</button>
           )}
-          {address ? <span className="pill">{shortAddress(address)}</span> : (
-            <button type="button" className="btn" onClick={() => void connect()}>Connect MetaMask</button>
-          )}
+        </div>
+      </nav>
+
+      <header className="hero">
+        <div>
+          <p className="kicker">Elections</p>
+          <h1>Your club. Your vote. Clear results.</h1>
+          <p>Run fair campus elections everyone can trust.</p>
+        </div>
+        <div className="hero-card">
+          <h3>Welcome{address ? '' : ' — sign in to continue'}</h3>
+          <p>{saved ? 'Your workspace is connected. Actions below are live.' : 'Open Settings once to connect this app to your deployment, then use it like any normal product.'}</p>
+          <div className="stats">
+            <div className="stat"><b>{address ? 'In' : '—'}</b><span>Signed in</span></div>
+            <div className="stat"><b>{saved ? 'On' : 'Off'}</b><span>Workspace</span></div>
+            <div className="stat"><b>{isSepolia ? 'OK' : '—'}</b><span>Network</span></div>
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <span className="chip">MHSSCE · CSE AIML</span>
-        <h1>CampusVote</h1>
-        <p>Transparent campus elections on Sepolia</p>
-      </section>
+      <div className="workspace">
 
-      <section className="panel">
-        <h3>Contract</h3>
-        <p className="muted">Deploy <code>CampusVoting.sol</code> in Remix on Sepolia, then paste the address.</p>
-        <div className="row">
-          <input value={contractAddr} onChange={(e) => setContractAddr(e.target.value)} placeholder="0x…" spellCheck={false} />
-          <button type="button" className="btn" onClick={saveAddress}>Save</button>
-        </div>
-      </section>
-
-
-      <div className="layout-split">
-        <section className="panel">
-          <h3>Ballot desk</h3>
-          <p className="muted">Owner creates proposals. Each wallet votes once.</p>
-          <label>Proposal title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        <section className="card">
+          <h2>Create an election</h2>
+          <p className="sub">Admins publish a question. Voters answer yes or no — once each.</p>
+          <label>What are people voting on?</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Elect club president" />
           <div className="row">
-            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Create proposal', async () => getContract(saved!, abi, signer!).createProposal(title))}>Create proposal</button>
-          </div>
-          <label>Proposal id</label>
-          <input value={proposalId} onChange={(e) => setProposalId(e.target.value)} />
-          <div className="row">
-            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Vote YES', async () => getContract(saved!, abi, signer!).vote(BigInt(proposalId), true))}>Vote YES</button>
-            <button type="button" className="btn ghost" disabled={!ready} onClick={() => void run('Vote NO', async () => getContract(saved!, abi, signer!).vote(BigInt(proposalId), false))}>Vote NO</button>
-            <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
-              const p = await getContract(saved!, abi, signer!).getProposal(BigInt(proposalId))
-              setOut(`${p.title}\nYes ${p.yesVotes} · No ${p.noVotes}`)
-            }}>Read tallies</button>
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Publishing election', async () => getContract(saved!, abi, signer!).createProposal(title))}>Publish election</button>
           </div>
         </section>
-        <section className="panel">
-          <h3>How it feels live</h3>
-          <p className="muted">Treat this like a real election booth: connect, cast, verify on Etherscan.</p>
-          <ol className="muted">
-            <li>Deploy as club admin</li>
-            <li>Create one proposal</li>
-            <li>Students vote from their wallets</li>
-            <li>Screenshot tallies for lab marks</li>
-          </ol>
+        <section className="card">
+          <h2>Cast your vote</h2>
+          <p className="sub">Pick the election number you were given, then choose a side.</p>
+          <label>Election number</label>
+          <input value={proposalId} onChange={(e) => setProposalId(e.target.value)} />
+          <div className="row">
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Submitting yes', async () => getContract(saved!, abi, signer!).vote(BigInt(proposalId), true))}>Vote Yes</button>
+            <button type="button" className="btn secondary" disabled={!ready} onClick={() => void run('Submitting no', async () => getContract(saved!, abi, signer!).vote(BigInt(proposalId), false))}>Vote No</button>
+            <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
+              const p = await getContract(saved!, abi, signer!).getProposal(BigInt(proposalId))
+              setResult(`${p.title}\n\nYes  ${p.yesVotes}\nNo   ${p.noVotes}`)
+            }}>See results</button>
+          </div>
         </section>
       </div>
 
-
       {(status || txHash) && (
-        <div className="status">
+        <div className="toast">
           {status}
           {txHash && (
             <>
-              {'\n'}Tx: <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">{txHash.slice(0, 10)}…</a>
+              {' · '}
+              <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a>
             </>
           )}
         </div>
       )}
-      {out && <pre className="out">{out}</pre>}
+      {result && <pre className="result">{result}</pre>}
 
-      <p className="footer">See this folder&apos;s README.md for deep Solidity notes, submission checklist, and viva questions.</p>
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Workspace connection</h3>
+            <p>Paste the deployment id from your admin once. Everyday users never need this screen again.</p>
+            <label>Deployment id</label>
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            <div className="row">
+              <button type="button" className="btn" onClick={saveConnection}>Save & close</button>
+              <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="footer">
+        <span>© CampusVote</span>
+        <span>Built for real campus workflows</span>
+      </footer>
     </div>
   )
 }

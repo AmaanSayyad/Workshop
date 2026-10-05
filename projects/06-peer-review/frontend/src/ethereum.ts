@@ -2,6 +2,7 @@ import { BrowserProvider, Contract, JsonRpcSigner, keccak256, toUtf8Bytes } from
 
 export const SEPOLIA_CHAIN_ID = 11155111n
 export const SEPOLIA_HEX = '0xaa36a7'
+export const STORAGE_KEY = 'app-connection-id'
 
 declare global {
   interface Window {
@@ -22,16 +23,16 @@ export function isAddressLike(v: string) {
 }
 
 export async function connectWallet() {
-  if (!window.ethereum) throw new Error('Install MetaMask to continue')
+  if (!window.ethereum) throw new Error('A wallet extension is required to sign in')
   const provider = new BrowserProvider(window.ethereum)
   await provider.send('eth_requestAccounts', [])
   const signer = await provider.getSigner()
   const network = await provider.getNetwork()
-  return { address: await signer.getAddress(), signer, chainId: network.chainId, provider }
+  return { address: await signer.getAddress(), signer, chainId: network.chainId }
 }
 
 export async function switchToSepolia() {
-  if (!window.ethereum) throw new Error('Install MetaMask')
+  if (!window.ethereum) throw new Error('Wallet not found')
   try {
     await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: SEPOLIA_HEX }] })
   } catch (err: unknown) {
@@ -61,5 +62,3 @@ export function hashText(text: string) {
 export function explorerTx(hash: string) {
   return `https://sepolia.etherscan.io/tx/${hash}`
 }
-
-export const STORAGE_KEY = 'contract-address'

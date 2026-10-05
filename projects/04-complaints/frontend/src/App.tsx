@@ -15,151 +15,200 @@ import {
 import { abi } from './abi'
 
 export default function App() {
+
   const [address, setAddress] = useState<string | null>(null)
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null)
   const [chainId, setChainId] = useState<bigint | null>(null)
-  const [contractAddr, setContractAddr] = useState('')
+  const [appId, setAppId] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [out, setOut] = useState('')
+  const [result, setResult] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [category, setCategory] = useState('Lost')
-  const [description, setDescription] = useState('Lost ID near Seminar Hall')
-  const [ticketId, setTicketId] = useState('0')
-  const [newStatus, setNewStatus] = useState('1')
-  const labels = ['Open', 'InProgress', 'Resolved', 'Closed']
-
-
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
+  const ready = Boolean(signer && saved && isSepolia && !busy)
 
   useEffect(() => {
-    const s = localStorage.getItem(STORAGE_KEY)
+    const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
+    const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
     if (s && isAddressLike(s)) {
-      setContractAddr(s)
+      setAppId(s)
       setSaved(s)
     }
   }, [])
 
-  async function connect() {
+  async function signIn() {
     try {
       const w = await connectWallet()
       setAddress(w.address)
       setSigner(w.signer)
       setChainId(w.chainId)
+      if (w.chainId !== SEPOLIA_CHAIN_ID) {
+        await switchToSepolia()
+        const again = await connectWallet()
+        setAddress(again.address)
+        setSigner(again.signer)
+        setChainId(again.chainId)
+      }
       setStatus('')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Wallet error')
+      setStatus(e instanceof Error ? e.message : 'Could not sign in')
     }
   }
 
-  function saveAddress() {
-    const v = contractAddr.trim()
+  function saveConnection() {
+    const v = appId.trim()
     if (!isAddressLike(v)) {
-      setStatus('Enter a valid 0x contract address')
+      setStatus('Paste a valid app connection id (0x…)')
       return
     }
     localStorage.setItem(STORAGE_KEY, v)
     setSaved(v)
-    setStatus('Contract address saved')
+    setSettingsOpen(false)
+    setStatus('Connected to your deployment')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
+    if (!signer || !saved) {
+      setStatus('Sign in and connect your deployment in Settings first')
+      setSettingsOpen(true)
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet network, then try again')
+      return
+    }
     setBusy(true)
-    setStatus(label)
+    setStatus(label + '…')
     setTxHash(null)
     try {
       const tx = await fn()
       setTxHash(tx.hash)
-      setStatus(label + ' — confirming…')
+      setStatus('Waiting for confirmation…')
       await tx.wait()
-      setStatus(label + ' — confirmed')
+      setStatus(label + ' — done')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Tx failed')
+      setStatus(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [signer, saved, isSepolia])
 
-  const ready = Boolean(signer && saved && isSepolia && !busy)
+  const [category, setCategory] = useState('Lost')
+  const [description, setDescription] = useState('')
+  const [ticketId, setTicketId] = useState('0')
+  const [newStatus, setNewStatus] = useState('1')
+
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <strong>CampusDesk</strong>
-          <span>Sepolia · ComplaintTracker</span>
+    <div className="shell">
+      <nav className="nav">
+        <div className="logo">
+          <div className="mark">C</div>
+          <div>
+            <strong>CampusDesk</strong>
+            <small>Support</small>
+          </div>
         </div>
-        <div className="row" style={{ margin: 0 }}>
-          {address && !isSepolia && (
-            <button type="button" className="btn ghost" onClick={() => void switchToSepolia().then(connect)}>
-              Switch Sepolia
-            </button>
+        <div className="nav-actions">
+          <button type="button" className="btn secondary" onClick={() => setSettingsOpen(true)}>Settings</button>
+          {address ? (
+            <span className="pill">{shortAddress(address)}</span>
+          ) : (
+            <button type="button" className="btn" onClick={() => void signIn()}>Sign in</button>
           )}
-          {address ? <span className="pill">{shortAddress(address)}</span> : (
-            <button type="button" className="btn" onClick={() => void connect()}>Connect MetaMask</button>
-          )}
+        </div>
+      </nav>
+
+      <header className="hero">
+        <div>
+          <p className="kicker">Support</p>
+          <h1>File a ticket. Track the fix.</h1>
+          <p>Lost & found and facility issues, tracked end to end.</p>
+        </div>
+        <div className="hero-card">
+          <h3>Welcome{address ? '' : ' — sign in to continue'}</h3>
+          <p>{saved ? 'Your workspace is connected. Actions below are live.' : 'Open Settings once to connect this app to your deployment, then use it like any normal product.'}</p>
+          <div className="stats">
+            <div className="stat"><b>{address ? 'In' : '—'}</b><span>Signed in</span></div>
+            <div className="stat"><b>{saved ? 'On' : 'Off'}</b><span>Workspace</span></div>
+            <div className="stat"><b>{isSepolia ? 'OK' : '—'}</b><span>Network</span></div>
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <span className="chip">MHSSCE · CSE AIML</span>
-        <h1>CampusDesk</h1>
-        <p>Lost & found and facility tickets, on-chain</p>
-      </section>
+      <div className="workspace">
 
-      <section className="panel">
-        <h3>Contract</h3>
-        <p className="muted">Deploy <code>ComplaintTracker.sol</code> in Remix on Sepolia, then paste the address.</p>
-        <div className="row">
-          <input value={contractAddr} onChange={(e) => setContractAddr(e.target.value)} placeholder="0x…" spellCheck={false} />
-          <button type="button" className="btn" onClick={saveAddress}>Save</button>
-        </div>
-      </section>
-
-
-      <div className="layout-split">
-        <section className="panel">
-          <h3>New ticket</h3>
+        <section className="card">
+          <h2>New request</h2>
+          <p className="sub">Lost ID? Broken projector? File it in under a minute.</p>
           <label>Category</label>
-          <input value={category} onChange={(e) => setCategory(e.target.value)} />
-          <label>Description</label>
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option>Lost</option><option>Found</option><option>Facility</option><option>Other</option>
+          </select>
+          <label>What happened?</label>
+          <textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
           <div className="row">
-            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Create ticket', async () => getContract(saved!, abi, signer!).createTicket(category, description))}>File ticket</button>
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Filing ticket', async () => getContract(saved!, abi, signer!).createTicket(category, description))}>Submit ticket</button>
           </div>
         </section>
-        <section className="panel">
-          <h3>Admin desk</h3>
-          <label>Ticket id</label>
+        <section className="card">
+          <h2>Staff updates</h2>
+          <p className="sub">Admins move tickets through the workflow.</p>
+          <label>Ticket number</label>
           <input value={ticketId} onChange={(e) => setTicketId(e.target.value)} />
-          <label>Status (0-3)</label>
-          <input value={newStatus} onChange={(e) => setNewStatus(e.target.value)} />
+          <label>New status</label>
+          <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+            <option value="0">Open</option>
+            <option value="1">In progress</option>
+            <option value="2">Resolved</option>
+            <option value="3">Closed</option>
+          </select>
           <div className="row">
-            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Update status', async () => getContract(saved!, abi, signer!).updateStatus(BigInt(ticketId), Number(newStatus)))}>Update</button>
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Updating ticket', async () => getContract(saved!, abi, signer!).updateStatus(BigInt(ticketId), Number(newStatus)))}>Update status</button>
             <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
+              const labels = ['Open','In progress','Resolved','Closed']
               const t = await getContract(saved!, abi, signer!).getTicket(BigInt(ticketId))
-              setOut(`#${ticketId} ${labels[Number(t.status)]}\n${t.category}\n${t.description}\nReporter ${t.reporter}`)
-            }}>Read</button>
+              setResult(`Ticket #${ticketId} · ${labels[Number(t.status)]}\n${t.category}\n${t.description}`)
+            }}>View ticket</button>
           </div>
         </section>
       </div>
 
-
       {(status || txHash) && (
-        <div className="status">
+        <div className="toast">
           {status}
           {txHash && (
             <>
-              {'\n'}Tx: <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">{txHash.slice(0, 10)}…</a>
+              {' · '}
+              <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a>
             </>
           )}
         </div>
       )}
-      {out && <pre className="out">{out}</pre>}
+      {result && <pre className="result">{result}</pre>}
 
-      <p className="footer">See this folder&apos;s README.md for deep Solidity notes, submission checklist, and viva questions.</p>
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Workspace connection</h3>
+            <p>Paste the deployment id from your admin once. Everyday users never need this screen again.</p>
+            <label>Deployment id</label>
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            <div className="row">
+              <button type="button" className="btn" onClick={saveConnection}>Save & close</button>
+              <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="footer">
+        <span>© CampusDesk</span>
+        <span>Built for real campus workflows</span>
+      </footer>
     </div>
   )
 }

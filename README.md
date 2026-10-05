@@ -5,7 +5,7 @@ Anjuman-I-Islam’s M. H. Saboo Siddik College of Engineering — CSE (AI & ML).
 
 Instructor: [Amaan Sayyad](https://github.com/AmaanSayyad) · [Portfolio](https://amaansayyad.com)
 
-Each mini-project is a **standalone product**: its own Solidity contract, its own React app (unique UI/UX), and an in-depth README.
+Each mini-project is a **standalone product app**: its own Solidity contract, a consumer-style React UI (wallet sign-in, human workflows, Settings for one-time deployment connection), and an in-depth README for the lab report.
 
 Repo: [github.com/AmaanSayyad/Workshop](https://github.com/AmaanSayyad/Workshop)
 

@@ -15,144 +15,193 @@ import {
 import { abi } from './abi'
 
 export default function App() {
+
   const [address, setAddress] = useState<string | null>(null)
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null)
   const [chainId, setChainId] = useState<bigint | null>(null)
-  const [contractAddr, setContractAddr] = useState('')
+  const [appId, setAppId] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [out, setOut] = useState('')
+  const [result, setResult] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [name, setName] = useState('CampusSentimentBERT')
-  const [version, setVersion] = useState('1.0.0')
-  const [framework, setFramework] = useState('PyTorch')
-  const [manifest, setManifest] = useState('model=CampusSentimentBERT;dataset=mhssce-reviews-2026;acc=0.91')
-  const contentHash = hashText(manifest)
-
-
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
+  const ready = Boolean(signer && saved && isSepolia && !busy)
 
   useEffect(() => {
-    const s = localStorage.getItem(STORAGE_KEY)
+    const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
+    const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
     if (s && isAddressLike(s)) {
-      setContractAddr(s)
+      setAppId(s)
       setSaved(s)
     }
   }, [])
 
-  async function connect() {
+  async function signIn() {
     try {
       const w = await connectWallet()
       setAddress(w.address)
       setSigner(w.signer)
       setChainId(w.chainId)
+      if (w.chainId !== SEPOLIA_CHAIN_ID) {
+        await switchToSepolia()
+        const again = await connectWallet()
+        setAddress(again.address)
+        setSigner(again.signer)
+        setChainId(again.chainId)
+      }
       setStatus('')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Wallet error')
+      setStatus(e instanceof Error ? e.message : 'Could not sign in')
     }
   }
 
-  function saveAddress() {
-    const v = contractAddr.trim()
+  function saveConnection() {
+    const v = appId.trim()
     if (!isAddressLike(v)) {
-      setStatus('Enter a valid 0x contract address')
+      setStatus('Paste a valid app connection id (0x…)')
       return
     }
     localStorage.setItem(STORAGE_KEY, v)
     setSaved(v)
-    setStatus('Contract address saved')
+    setSettingsOpen(false)
+    setStatus('Connected to your deployment')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
+    if (!signer || !saved) {
+      setStatus('Sign in and connect your deployment in Settings first')
+      setSettingsOpen(true)
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet network, then try again')
+      return
+    }
     setBusy(true)
-    setStatus(label)
+    setStatus(label + '…')
     setTxHash(null)
     try {
       const tx = await fn()
       setTxHash(tx.hash)
-      setStatus(label + ' — confirming…')
+      setStatus('Waiting for confirmation…')
       await tx.wait()
-      setStatus(label + ' — confirmed')
+      setStatus(label + ' — done')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Tx failed')
+      setStatus(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [signer, saved, isSepolia])
 
-  const ready = Boolean(signer && saved && isSepolia && !busy)
+  const [name, setName] = useState('CampusSentimentBERT')
+  const [version, setVersion] = useState('1.0.0')
+  const [framework, setFramework] = useState('PyTorch')
+  const [manifest, setManifest] = useState('model=CampusSentimentBERT;acc=0.91;seed=42')
+
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <strong>ModelProof</strong>
-          <span>Sepolia · AIModelRegistry</span>
+    <div className="shell">
+      <nav className="nav">
+        <div className="logo">
+          <div className="mark">M</div>
+          <div>
+            <strong>ModelProof</strong>
+            <small>ML Provenance</small>
+          </div>
         </div>
-        <div className="row" style={{ margin: 0 }}>
-          {address && !isSepolia && (
-            <button type="button" className="btn ghost" onClick={() => void switchToSepolia().then(connect)}>
-              Switch Sepolia
-            </button>
+        <div className="nav-actions">
+          <button type="button" className="btn secondary" onClick={() => setSettingsOpen(true)}>Settings</button>
+          {address ? (
+            <span className="pill">{shortAddress(address)}</span>
+          ) : (
+            <button type="button" className="btn" onClick={() => void signIn()}>Sign in</button>
           )}
-          {address ? <span className="pill">{shortAddress(address)}</span> : (
-            <button type="button" className="btn" onClick={() => void connect()}>Connect MetaMask</button>
-          )}
+        </div>
+      </nav>
+
+      <header className="hero">
+        <div>
+          <p className="kicker">ML Provenance</p>
+          <h1>Prove your model. Verify theirs.</h1>
+          <p>Register model fingerprints so teams can prove what’s real.</p>
+        </div>
+        <div className="hero-card">
+          <h3>Welcome{address ? '' : ' — sign in to continue'}</h3>
+          <p>{saved ? 'Your workspace is connected. Actions below are live.' : 'Open Settings once to connect this app to your deployment, then use it like any normal product.'}</p>
+          <div className="stats">
+            <div className="stat"><b>{address ? 'In' : '—'}</b><span>Signed in</span></div>
+            <div className="stat"><b>{saved ? 'On' : 'Off'}</b><span>Workspace</span></div>
+            <div className="stat"><b>{isSepolia ? 'OK' : '—'}</b><span>Network</span></div>
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <span className="chip">MHSSCE · CSE AIML</span>
-        <h1>ModelProof</h1>
-        <p>Register ML model hashes for AIML provenance</p>
-      </section>
+      <div className="workspace">
 
-      <section className="panel">
-        <h3>Contract</h3>
-        <p className="muted">Deploy <code>AIModelRegistry.sol</code> in Remix on Sepolia, then paste the address.</p>
-        <div className="row">
-          <input value={contractAddr} onChange={(e) => setContractAddr(e.target.value)} placeholder="0x…" spellCheck={false} />
-          <button type="button" className="btn" onClick={saveAddress}>Save</button>
-        </div>
-      </section>
-
-
-      <section className="panel">
-        <h3>register_model()</h3>
-        <label>name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
-        <label>version</label>
-        <input value={version} onChange={(e) => setVersion(e.target.value)} />
-        <label>framework</label>
-        <input value={framework} onChange={(e) => setFramework(e.target.value)} />
-        <label>manifest</label>
-        <textarea rows={3} value={manifest} onChange={(e) => setManifest(e.target.value)} />
-        <p className="muted">hash <code>{contentHash}</code></p>
-        <div className="row">
-          <button type="button" className="btn" disabled={!ready} onClick={() => void run('Register', async () => getContract(saved!, abi, signer!).registerModel(name, version, contentHash, framework))}>Register</button>
-          <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
-            const v = await getContract(saved!, abi, signer!).verifyModel(contentHash)
-            setOut(`found=${v.found}\nid=${v.id}\n${v.name}@${v.version}\npublisher=${v.publisher}`)
-          }}>Verify</button>
-        </div>
-      </section>
-
+        <section className="card">
+          <h2>Register a model</h2>
+          <p className="sub">Publish a fingerprint of your model card so others can verify provenance.</p>
+          <label>Model name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <label>Version</label>
+          <input value={version} onChange={(e) => setVersion(e.target.value)} />
+          <label>Framework</label>
+          <input value={framework} onChange={(e) => setFramework(e.target.value)} />
+          <label>Model card / manifest</label>
+          <textarea rows={4} value={manifest} onChange={(e) => setManifest(e.target.value)} />
+          <div className="row">
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Registering model', async () => getContract(saved!, abi, signer!).registerModel(name, version, hashText(manifest), framework))}>Register</button>
+          </div>
+        </section>
+        <section className="card">
+          <h2>Verify provenance</h2>
+          <p className="sub">Paste a model card to check if it was registered.</p>
+          <label>Manifest to verify</label>
+          <textarea rows={4} value={manifest} onChange={(e) => setManifest(e.target.value)} />
+          <div className="row">
+            <button type="button" className="btn" disabled={!signer || !saved} onClick={async () => {
+              const v = await getContract(saved!, abi, signer!).verifyModel(hashText(manifest))
+              setResult(v.found ? `Verified\n${v.name} @ ${v.version}\nPublisher ${v.publisher}` : 'No matching registration')
+            }}>Verify</button>
+          </div>
+        </section>
+      </div>
 
       {(status || txHash) && (
-        <div className="status">
+        <div className="toast">
           {status}
           {txHash && (
             <>
-              {'\n'}Tx: <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">{txHash.slice(0, 10)}…</a>
+              {' · '}
+              <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a>
             </>
           )}
         </div>
       )}
-      {out && <pre className="out">{out}</pre>}
+      {result && <pre className="result">{result}</pre>}
 
-      <p className="footer">See this folder&apos;s README.md for deep Solidity notes, submission checklist, and viva questions.</p>
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Workspace connection</h3>
+            <p>Paste the deployment id from your admin once. Everyday users never need this screen again.</p>
+            <label>Deployment id</label>
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            <div className="row">
+              <button type="button" className="btn" onClick={saveConnection}>Save & close</button>
+              <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="footer">
+        <span>© ModelProof</span>
+        <span>Built for real campus workflows</span>
+      </footer>
     </div>
   )
 }

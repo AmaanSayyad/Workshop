@@ -15,152 +15,196 @@ import {
 import { abi } from './abi'
 
 export default function App() {
+
   const [address, setAddress] = useState<string | null>(null)
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null)
   const [chainId, setChainId] = useState<bigint | null>(null)
-  const [contractAddr, setContractAddr] = useState('')
+  const [appId, setAppId] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [out, setOut] = useState('')
+  const [result, setResult] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [name, setName] = useState('Arduino Kit #12')
-  const [location, setLocation] = useState('L3 Lab Shelf B')
-  const [custodian, setCustodian] = useState('')
-  const [itemId, setItemId] = useState('0')
-  const [to, setTo] = useState('')
-
-
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
+  const ready = Boolean(signer && saved && isSepolia && !busy)
 
   useEffect(() => {
-    const s = localStorage.getItem(STORAGE_KEY)
+    const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
+    const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
     if (s && isAddressLike(s)) {
-      setContractAddr(s)
+      setAppId(s)
       setSaved(s)
     }
   }, [])
 
-  async function connect() {
+  async function signIn() {
     try {
       const w = await connectWallet()
       setAddress(w.address)
       setSigner(w.signer)
       setChainId(w.chainId)
+      if (w.chainId !== SEPOLIA_CHAIN_ID) {
+        await switchToSepolia()
+        const again = await connectWallet()
+        setAddress(again.address)
+        setSigner(again.signer)
+        setChainId(again.chainId)
+      }
       setStatus('')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Wallet error')
+      setStatus(e instanceof Error ? e.message : 'Could not sign in')
     }
   }
 
-  function saveAddress() {
-    const v = contractAddr.trim()
+  function saveConnection() {
+    const v = appId.trim()
     if (!isAddressLike(v)) {
-      setStatus('Enter a valid 0x contract address')
+      setStatus('Paste a valid app connection id (0x…)')
       return
     }
     localStorage.setItem(STORAGE_KEY, v)
     setSaved(v)
-    setStatus('Contract address saved')
+    setSettingsOpen(false)
+    setStatus('Connected to your deployment')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
+    if (!signer || !saved) {
+      setStatus('Sign in and connect your deployment in Settings first')
+      setSettingsOpen(true)
+      return
+    }
+    if (!isSepolia) {
+      setStatus('Switch your wallet network, then try again')
+      return
+    }
     setBusy(true)
-    setStatus(label)
+    setStatus(label + '…')
     setTxHash(null)
     try {
       const tx = await fn()
       setTxHash(tx.hash)
-      setStatus(label + ' — confirming…')
+      setStatus('Waiting for confirmation…')
       await tx.wait()
-      setStatus(label + ' — confirmed')
+      setStatus(label + ' — done')
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Tx failed')
+      setStatus(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [signer, saved, isSepolia])
 
-  const ready = Boolean(signer && saved && isSepolia && !busy)
+  const [name, setName] = useState('Arduino Kit')
+  const [location, setLocation] = useState('Lab shelf A')
+  const [custodian, setCustodian] = useState('')
+  const [itemId, setItemId] = useState('0')
+  const [to, setTo] = useState('')
+
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <strong>KitKeep</strong>
-          <span>Sepolia · InventoryLog</span>
+    <div className="shell">
+      <nav className="nav">
+        <div className="logo">
+          <div className="mark">K</div>
+          <div>
+            <strong>KitKeep</strong>
+            <small>Inventory</small>
+          </div>
         </div>
-        <div className="row" style={{ margin: 0 }}>
-          {address && !isSepolia && (
-            <button type="button" className="btn ghost" onClick={() => void switchToSepolia().then(connect)}>
-              Switch Sepolia
-            </button>
+        <div className="nav-actions">
+          <button type="button" className="btn secondary" onClick={() => setSettingsOpen(true)}>Settings</button>
+          {address ? (
+            <span className="pill">{shortAddress(address)}</span>
+          ) : (
+            <button type="button" className="btn" onClick={() => void signIn()}>Sign in</button>
           )}
-          {address ? <span className="pill">{shortAddress(address)}</span> : (
-            <button type="button" className="btn" onClick={() => void connect()}>Connect MetaMask</button>
-          )}
+        </div>
+      </nav>
+
+      <header className="hero">
+        <div>
+          <p className="kicker">Inventory</p>
+          <h1>Track equipment. Transfer custody.</h1>
+          <p>Know who has which lab kit — and where it is.</p>
+        </div>
+        <div className="hero-card">
+          <h3>Welcome{address ? '' : ' — sign in to continue'}</h3>
+          <p>{saved ? 'Your workspace is connected. Actions below are live.' : 'Open Settings once to connect this app to your deployment, then use it like any normal product.'}</p>
+          <div className="stats">
+            <div className="stat"><b>{address ? 'In' : '—'}</b><span>Signed in</span></div>
+            <div className="stat"><b>{saved ? 'On' : 'Off'}</b><span>Workspace</span></div>
+            <div className="stat"><b>{isSepolia ? 'OK' : '—'}</b><span>Network</span></div>
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <span className="chip">MHSSCE · CSE AIML</span>
-        <h1>KitKeep</h1>
-        <p>Lab equipment custody & location log</p>
-      </section>
+      <div className="workspace">
 
-      <section className="panel">
-        <h3>Contract</h3>
-        <p className="muted">Deploy <code>InventoryLog.sol</code> in Remix on Sepolia, then paste the address.</p>
-        <div className="row">
-          <input value={contractAddr} onChange={(e) => setContractAddr(e.target.value)} placeholder="0x…" spellCheck={false} />
-          <button type="button" className="btn" onClick={saveAddress}>Save</button>
-        </div>
-      </section>
-
-
-      <section className="panel">
-        <h3>Receive stock</h3>
-        <label>Item</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
-        <label>Location</label>
-        <input value={location} onChange={(e) => setLocation(e.target.value)} />
-        <label>Custodian</label>
-        <input value={custodian} onChange={(e) => setCustodian(e.target.value)} placeholder={address ?? '0x…'} />
-        <div className="row">
-          <button type="button" className="btn" disabled={!ready} onClick={() => void run('Add item', async () => getContract(saved!, abi, signer!).addItem(name, location, custodian.trim() || address!))}>Add item</button>
-        </div>
-      </section>
-      <section className="panel">
-        <h3>Transfer / relocate</h3>
-        <label>Item id</label>
-        <input value={itemId} onChange={(e) => setItemId(e.target.value)} />
-        <label>Transfer to</label>
-        <input value={to} onChange={(e) => setTo(e.target.value)} />
-        <div className="row">
-          <button type="button" className="btn" disabled={!ready} onClick={() => void run('Transfer', async () => getContract(saved!, abi, signer!).transferCustody(BigInt(itemId), to.trim()))}>Transfer custody</button>
-          <button type="button" className="btn ghost" disabled={!ready} onClick={() => void run('Location', async () => getContract(saved!, abi, signer!).updateLocation(BigInt(itemId), location))}>Update location</button>
-          <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
-            const i = await getContract(saved!, abi, signer!).getItem(BigInt(itemId))
-            setOut(`${i.name}\n@ ${i.location}\nCustodian ${i.custodian}`)
-          }}>Inspect</button>
-        </div>
-      </section>
-
+        <section className="card">
+          <h2>Add equipment</h2>
+          <p className="sub">Register a kit and assign who is responsible.</p>
+          <label>Item name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <label>Location</label>
+          <input value={location} onChange={(e) => setLocation(e.target.value)} />
+          <label>Custodian wallet</label>
+          <input value={custodian} onChange={(e) => setCustodian(e.target.value)} placeholder={address ?? '0x…'} />
+          <div className="row">
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Adding item', async () => getContract(saved!, abi, signer!).addItem(name, location, custodian.trim() || address!))}>Add to inventory</button>
+          </div>
+        </section>
+        <section className="card">
+          <h2>Move or hand off</h2>
+          <p className="sub">Update location or transfer custody to another person.</p>
+          <label>Item number</label>
+          <input value={itemId} onChange={(e) => setItemId(e.target.value)} />
+          <label>New custodian</label>
+          <input value={to} onChange={(e) => setTo(e.target.value)} />
+          <div className="row">
+            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Transferring', async () => getContract(saved!, abi, signer!).transferCustody(BigInt(itemId), to.trim()))}>Transfer</button>
+            <button type="button" className="btn secondary" disabled={!ready} onClick={() => void run('Updating location', async () => getContract(saved!, abi, signer!).updateLocation(BigInt(itemId), location))}>Save location</button>
+            <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
+              const i = await getContract(saved!, abi, signer!).getItem(BigInt(itemId))
+              setResult(`${i.name}\nLocated at ${i.location}\nWith ${i.custodian}`)
+            }}>Inspect</button>
+          </div>
+        </section>
+      </div>
 
       {(status || txHash) && (
-        <div className="status">
+        <div className="toast">
           {status}
           {txHash && (
             <>
-              {'\n'}Tx: <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">{txHash.slice(0, 10)}…</a>
+              {' · '}
+              <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a>
             </>
           )}
         </div>
       )}
-      {out && <pre className="out">{out}</pre>}
+      {result && <pre className="result">{result}</pre>}
 
-      <p className="footer">See this folder&apos;s README.md for deep Solidity notes, submission checklist, and viva questions.</p>
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Workspace connection</h3>
+            <p>Paste the deployment id from your admin once. Everyday users never need this screen again.</p>
+            <label>Deployment id</label>
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            <div className="row">
+              <button type="button" className="btn" onClick={saveConnection}>Save & close</button>
+              <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="footer">
+        <span>© KitKeep</span>
+        <span>Built for real campus workflows</span>
+      </footer>
     </div>
   )
 }
