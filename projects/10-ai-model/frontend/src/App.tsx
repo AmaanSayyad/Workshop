@@ -129,12 +129,12 @@ export default function App() {
           <p>Register model fingerprints so teams can prove what’s real.</p>
         </div>
         <div className="hero-card">
-          <h3>Welcome{address ? '' : ' — sign in to continue'}</h3>
-          <p>{saved ? 'Your workspace is connected. Actions below are live.' : 'Open Settings once to connect this app to your deployment, then use it like any normal product.'}</p>
+          <h3>{address ? 'You are signed in' : 'Sign in to get started'}</h3>
+          <p>{saved ? 'Everything below is ready to use.' : 'First time here? Open Settings, paste the app ID from your organizer, then continue as usual.'}</p>
           <div className="stats">
-            <div className="stat"><b>{address ? 'In' : '—'}</b><span>Signed in</span></div>
-            <div className="stat"><b>{saved ? 'On' : 'Off'}</b><span>Workspace</span></div>
-            <div className="stat"><b>{isSepolia ? 'OK' : '—'}</b><span>Network</span></div>
+            <div className="stat"><b>{address ? 'Yes' : 'No'}</b><span>Account</span></div>
+            <div className="stat"><b>{saved ? 'Yes' : 'No'}</b><span>Connected</span></div>
+            <div className="stat"><b>{isSepolia || !address ? (address ? 'Ready' : '—') : 'Fix'}</b><span>Status</span></div>
           </div>
         </div>
       </header>
@@ -186,12 +186,12 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Workspace connection</h3>
-            <p>Paste the deployment id from your admin once. Everyday users never need this screen again.</p>
-            <label>Deployment id</label>
+            <h3>App setup</h3>
+            <p>Organizers paste the shared app ID once. After that, everyone just signs in and uses the product.</p>
+            <label>App ID</label>
             <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
             <div className="row">
-              <button type="button" className="btn" onClick={saveConnection}>Save & close</button>
+              <button type="button" className="btn" onClick={saveConnection}>Save</button>
               <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
             </div>
           </div>
