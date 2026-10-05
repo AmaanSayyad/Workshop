@@ -2,15 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ContractTransactionResponse, JsonRpcSigner } from 'ethers'
 import { formatEther, parseEther } from 'ethers'
 import {
-  SEPOLIA_CHAIN_ID,
-  STORAGE_KEY,
-  connectWallet,
-  explorerTx,
-  getContract,
-  hashText,
-  isAddressLike,
-  shortAddress,
-  switchToSepolia,
+  SEPOLIA_CHAIN_ID, STORAGE_KEY, connectWallet, explorerTx, getContract, hashText,
+  isAddressLike, shortAddress, switchToSepolia,
 } from './ethereum'
 import { abi } from './abi'
 
@@ -26,6 +19,7 @@ export default function App() {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [result, setResult] = useState('')
   const [busy, setBusy] = useState(false)
+  const [tab, setTab] = useState<'create' | 'use'>('use')
 
   const isSepolia = chainId === SEPOLIA_CHAIN_ID
   const ready = Boolean(signer && saved && isSepolia && !busy)
@@ -33,24 +27,17 @@ export default function App() {
   useEffect(() => {
     const fromEnv = import.meta.env.VITE_APP_ID as string | undefined
     const s = fromEnv && isAddressLike(fromEnv) ? fromEnv : localStorage.getItem(STORAGE_KEY)
-    if (s && isAddressLike(s)) {
-      setAppId(s)
-      setSaved(s)
-    }
+    if (s && isAddressLike(s)) { setAppId(s); setSaved(s) }
   }, [])
 
   async function signIn() {
     try {
       const w = await connectWallet()
-      setAddress(w.address)
-      setSigner(w.signer)
-      setChainId(w.chainId)
+      setAddress(w.address); setSigner(w.signer); setChainId(w.chainId)
       if (w.chainId !== SEPOLIA_CHAIN_ID) {
         await switchToSepolia()
         const again = await connectWallet()
-        setAddress(again.address)
-        setSigner(again.signer)
-        setChainId(again.chainId)
+        setAddress(again.address); setSigner(again.signer); setChainId(again.chainId)
       }
       setStatus('')
     } catch (e) {
@@ -60,40 +47,20 @@ export default function App() {
 
   function saveConnection() {
     const v = appId.trim()
-    if (!isAddressLike(v)) {
-      setStatus('Paste a valid app connection id (0x…)')
-      return
-    }
+    if (!isAddressLike(v)) { setStatus('Paste a valid app ID'); return }
     localStorage.setItem(STORAGE_KEY, v)
-    setSaved(v)
-    setSettingsOpen(false)
-    setStatus('Connected to your deployment')
+    setSaved(v); setSettingsOpen(false); setStatus('App connected')
   }
 
   const run = useCallback(async (label: string, fn: () => Promise<ContractTransactionResponse>) => {
-    if (!signer || !saved) {
-      setStatus('Sign in and connect your deployment in Settings first')
-      setSettingsOpen(true)
-      return
-    }
-    if (!isSepolia) {
-      setStatus('Switch your wallet network, then try again')
-      return
-    }
-    setBusy(true)
-    setStatus(label + '…')
-    setTxHash(null)
+    if (!signer || !saved) { setSettingsOpen(true); setStatus('Sign in and connect the app first'); return }
+    if (!isSepolia) { setStatus('Switch network in your wallet, then retry'); return }
+    setBusy(true); setStatus(label + '…'); setTxHash(null)
     try {
-      const tx = await fn()
-      setTxHash(tx.hash)
-      setStatus('Waiting for confirmation…')
-      await tx.wait()
-      setStatus(label + ' — done')
+      const tx = await fn(); setTxHash(tx.hash); setStatus('Confirming…'); await tx.wait(); setStatus(label + ' complete')
     } catch (e) {
       setStatus(e instanceof Error ? e.message : 'Something went wrong')
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }, [signer, saved, isSepolia])
 
   const [amount, setAmount] = useState('0.001')
@@ -112,9 +79,7 @@ export default function App() {
         </div>
         <div className="nav-actions">
           <button type="button" className="btn secondary" onClick={() => setSettingsOpen(true)}>Settings</button>
-          {address ? (
-            <span className="pill">{shortAddress(address)}</span>
-          ) : (
+          {address ? <span className="pill">{shortAddress(address)}</span> : (
             <button type="button" className="btn" onClick={() => void signIn()}>Sign in</button>
           )}
         </div>
@@ -124,66 +89,71 @@ export default function App() {
         <div>
           <p className="kicker">Campaigns</p>
           <h1>Share the link. Watch support grow.</h1>
-          <p>Raise for campus causes with a transparent tip jar.</p>
+          <p className="hero-lead">Raise for campus causes with a transparent tip jar.</p>
+          <div className="feature-row">
+            <span className="feature">Live progress</span>
+            <span className="feature">Transparent tips</span>
+            <span className="feature">Owner withdraw</span>
+          </div>
         </div>
-        <div className="hero-card">
-          <h3>{address ? 'You are signed in' : 'Sign in to get started'}</h3>
-          <p>{saved ? 'Everything below is ready to use.' : 'First time here? Open Settings, paste the app ID from your organizer, then continue as usual.'}</p>
-          <div className="stats">
-            <div className="stat"><b>{address ? 'Yes' : 'No'}</b><span>Account</span></div>
-            <div className="stat"><b>{saved ? 'Yes' : 'No'}</b><span>Connected</span></div>
-            <div className="stat"><b>{isSepolia || !address ? (address ? 'Ready' : '—') : 'Fix'}</b><span>Status</span></div>
+        <div className="visual" data-kind="fund">
+          <div className="visual-inner"><div className="orb" /></div>
+          <div className="visual-caption">
+            <strong>{address ? 'Signed in' : 'Guest mode'}</strong>
+            <span>{saved ? 'Ready to use' : 'Connect app ID in Settings once'}</span>
           </div>
         </div>
       </header>
 
-      <div className="workspace">
-
-        <section className="card">
-          <h2>Support this campaign</h2>
-          <p className="sub">Every contribution is recorded. Progress updates live.</p>
-          <div className="meter"><i style={{ width: `${Math.min(progress, 100)}%` }} /></div>
-          <label>Amount (ETH)</label>
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <div className="row">
-            <button type="button" className="btn" disabled={!ready} onClick={() => void run('Sending support', async () => getContract(saved!, abi, signer!).donate({ value: parseEther(amount) }))}>Contribute</button>
-            <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
-              const i = await getContract(saved!, abi, signer!).getInfo()
-              const pct = i.goal > 0n ? Number((i.raised * 100n) / i.goal) : 0
-              setProgress(pct)
-              setResult(`${i.name}\nRaised ${formatEther(i.raised)} / ${formatEther(i.goal)} ETH\n${i.isClosed ? 'Campaign closed' : 'Campaign open'}`)
-            }}>Refresh progress</button>
-          </div>
-        </section>
-        <section className="card">
-          <h2>Campaign owner</h2>
-          <p className="sub">Withdraw when you're ready to use the funds.</p>
-          <div className="row">
-            <button type="button" className="btn secondary" disabled={!ready} onClick={() => void run('Withdrawing funds', async () => getContract(saved!, abi, signer!).withdraw())}>Withdraw balance</button>
-          </div>
-        </section>
+      <div className="tabs">
+        <button type="button" className={tab === 'use' ? 'tab active' : 'tab'} onClick={() => setTab('use')}>Use app</button>
+        <button type="button" className={tab === 'create' ? 'tab active' : 'tab'} onClick={() => setTab('create')}>Create / manage</button>
       </div>
 
-      {(status || txHash) && (
+      <div className="workspace">
+        {tab === 'use' ? (
+          <section className="card">
+            <h2>Support this campaign</h2>
+            <p className="sub">Every contribution is recorded with live progress.</p>
+            <div className="meter"><i style={{ width: `${Math.min(progress, 100)}%` }} /></div>
+            <div className="field"><label>Amount (ETH)</label><input value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+            <div className="row">
+              <button type="button" className="btn" disabled={!ready} onClick={() => void run('Sending support', async () => getContract(saved!, abi, signer!).donate({ value: parseEther(amount) }))}>Contribute</button>
+              <button type="button" className="btn ghost" disabled={!signer || !saved} onClick={async () => {
+                const i = await getContract(saved!, abi, signer!).getInfo()
+                const pct = i.goal > 0n ? Number((i.raised * 100n) / i.goal) : 0
+                setProgress(pct)
+                setResult(`${i.name}\nRaised ${formatEther(i.raised)} / ${formatEther(i.goal)} ETH\n${i.isClosed ? 'Closed' : 'Open'}`)
+              }}>Refresh progress</button>
+            </div>
+          </section>
+        ) : (
+          <section className="card">
+            <h2>Campaign owner</h2>
+            <p className="sub">Withdraw when you are ready to use the funds.</p>
+            <div className="row"><button type="button" className="btn secondary" disabled={!ready} onClick={() => void run('Withdrawing', async () => getContract(saved!, abi, signer!).withdraw())}>Withdraw balance</button></div>
+          </section>
+        )}
+      </div>
+
+      {result && <pre className="result">{result}</pre>}
+
+      {status && (
         <div className="toast">
           {status}
-          {txHash && (
-            <>
-              {' · '}
-              <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a>
-            </>
-          )}
+          {txHash && <> · <a href={explorerTx(txHash)} target="_blank" rel="noreferrer">View receipt</a></>}
         </div>
       )}
-      {result && <pre className="result">{result}</pre>}
 
       {settingsOpen && (
         <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>App setup</h3>
-            <p>Organizers paste the shared app ID once. After that, everyone just signs in and uses the product.</p>
-            <label>App ID</label>
-            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            <p>Organizers paste the shared app ID once. After that, everyone signs in and uses the product.</p>
+            <div className="field">
+              <label>App ID</label>
+              <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="0x…" spellCheck={false} />
+            </div>
             <div className="row">
               <button type="button" className="btn" onClick={saveConnection}>Save</button>
               <button type="button" className="btn secondary" onClick={() => setSettingsOpen(false)}>Cancel</button>
@@ -194,7 +164,7 @@ export default function App() {
 
       <footer className="footer">
         <span>© Fundraise</span>
-        <span>Built for real campus workflows</span>
+        <span>Made for real campus workflows</span>
       </footer>
     </div>
   )

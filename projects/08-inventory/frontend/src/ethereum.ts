@@ -23,7 +23,7 @@ export function isAddressLike(v: string) {
 }
 
 export async function connectWallet() {
-  if (!window.ethereum) throw new Error('A wallet extension is required to sign in')
+  if (!window.ethereum) throw new Error('Install a wallet to sign in')
   const provider = new BrowserProvider(window.ethereum)
   await provider.send('eth_requestAccounts', [])
   const signer = await provider.getSigner()
